@@ -3,40 +3,29 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Escáner Web Simple</title>
+  <title>Escáner Web (fix)</title>
   <style>
     :root { --bg:#0b1320; --fg:#eaeefb; --acc:#4f8cff; --mut:#9fb0d0; }
     * { box-sizing: border-box; }
-    body {
-      margin: 0; font-family: system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, "Helvetica Neue", Arial, "Noto Sans", "Apple Color Emoji", "Segoe UI Emoji";
-      background: var(--bg); color: var(--fg);
-      display: grid; grid-template-rows: auto 1fr auto; min-height: 100dvh;
-    }
-    header, footer { padding: 12px 16px; background: rgba(255,255,255,0.03); backdrop-filter: blur(6px); border-bottom: 1px solid rgba(255,255,255,0.08); }
-    footer { border-top: 1px solid rgba(255,255,255,0.08); border-bottom: none; font-size: 12px; color: var(--mut); }
-    h1 { font-size: 18px; margin:0; display:flex; align-items:center; gap:10px;}
-    main { padding: 12px; display: grid; gap: 12px; }
-    .row { display:flex; gap:10px; flex-wrap: wrap; align-items: center; }
-    button, select {
-      border: 1px solid rgba(255,255,255,0.15); background: #111a2e; color: var(--fg);
-      padding: 10px 14px; border-radius: 10px; cursor: pointer; font-weight: 600;
-    }
-    button.primary { background: var(--acc); color: #081020; border-color: transparent; }
-    button:disabled { opacity:.5; cursor:not-allowed; }
-    video { width: 100%; max-height: 60dvh; background:#000; border-radius: 12px; }
-    .card { background:#0f1a33; border:1px solid rgba(255,255,255,0.08); border-radius: 12px; padding:12px; }
-    .grid { display:grid; grid-template-columns: 1fr auto; gap:8px; align-items:center; }
+    body { margin:0; font-family: system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, Arial; background: var(--bg); color: var(--fg);
+           display:grid; grid-template-rows:auto 1fr auto; min-height:100dvh; }
+    header, footer { padding: 12px 16px; background: rgba(255,255,255,0.03); border-bottom: 1px solid rgba(255,255,255,0.08); }
+    footer { border-top: 1px solid rgba(255,255,255,0.08); border-bottom:none; font-size:12px; color:var(--mut); }
+    h1 { font-size:18px; margin:0; display:flex; align-items:center; gap:10px; }
+    main { padding: 12px; display:grid; gap:12px; }
+    .row { display:flex; gap:10px; flex-wrap:wrap; align-items:center; }
+    button, select, input[type=file] { border:1px solid rgba(255,255,255,0.15); background:#111a2e; color:var(--fg); padding:10px 14px; border-radius:10px; font-weight:600; }
+    button.primary { background:var(--acc); color:#081020; border-color:transparent; }
+    video { width:100%; max-height:62dvh; background:#000; border-radius:12px; }
     .pill { background:#0b172f; border:1px dashed rgba(255,255,255,0.2); padding:6px 10px; border-radius:999px; color:var(--mut); font-weight:600;}
-    table { width:100%; border-collapse: collapse; font-size: 14px; }
-    th, td { padding: 8px; border-bottom: 1px solid rgba(255,255,255,0.08); }
-    th { text-align: left; color: var(--mut); font-weight: 700; }
     .snackbar { position: fixed; bottom: 16px; left: 50%; transform: translateX(-50%); background: #101828; color: #fff; padding: 10px 16px; border-radius: 12px; border: 1px solid rgba(255,255,255,.1); opacity: 0; transition: opacity .25s ease; }
     .snackbar.show { opacity: 1; }
+    .error { color:#ffb3b3; font-weight:600; }
   </style>
 </head>
 <body>
   <header>
-    <h1>📷 Escáner Web Simple <span class="pill" id="count">0</span></h1>
+    <h1>📷 Escáner Web <span class="pill" id="count">0</span></h1>
   </header>
 
   <main>
@@ -45,30 +34,28 @@
       <button id="btnStart" class="primary">Iniciar cámara</button>
       <button id="btnStop">Detener</button>
       <button id="btnExport">Exportar CSV</button>
+      <input type="file" id="fileInput" accept="image/*" />
       <button id="btnClear">Borrar todo</button>
     </div>
 
-    <div class="card">
-      <video id="video" autoplay muted playsinline></video>
-    </div>
+    <video id="video" autoplay muted playsinline></video>
+    <div id="err" class="error"></div>
 
-    <div class="card">
-      <div class="grid">
-        <strong>Últimos escaneos</strong>
-        <span class="pill">muestra 10</span>
-      </div>
-      <table>
-        <thead><tr><th>Código</th><th>Fecha</th></tr></thead>
+    <div>
+      <strong>Últimos 10</strong>
+      <table style="width:100%; border-collapse:collapse; font-size:14px;">
+        <thead><tr><th style="text-align:left;">Código</th><th style="text-align:left;">Fecha</th></tr></thead>
         <tbody id="tbody"></tbody>
       </table>
     </div>
   </main>
 
-  <footer>Funciona mejor en Chrome/Android. iOS/Safari puede requerir permisos adicionales.</footer>
+  <footer>
+    Requisitos: HTTPS, dar permiso de cámara, y que el navegador soporte MediaDevices. Chrome/Android es el más estable.
+  </footer>
 
   <div id="snack" class="snackbar" role="status" aria-live="polite"></div>
 
-  <!-- ZXing browser (lector de códigos) -->
   <script type="module">
     import { BrowserMultiFormatReader } from "https://cdn.jsdelivr.net/npm/@zxing/library@0.20.0/esm5/index.js";
 
@@ -79,131 +66,107 @@
     const btnStop = document.getElementById('btnStop');
     const btnExport = document.getElementById('btnExport');
     const btnClear = document.getElementById('btnClear');
+    const fileInput = document.getElementById('fileInput');
     const tbody = document.getElementById('tbody');
     const snack = document.getElementById('snack');
+    const errEl = document.getElementById('err');
     const countEl = document.getElementById('count');
 
-    const STORAGE_KEY = 'web_scans_v1';
+    const STORAGE_KEY = 'web_scans_v2';
+    let lastCode = null, lastHit = 0;
+    let controls = null; // para detener decodeFromVideoDevice
 
-    let currentStream = null;
-    let lastCode = null;
-    let lastHit = 0;
-    let running = false;
+    function showSnack(msg){ snack.textContent = msg; snack.classList.add('show'); setTimeout(()=>snack.classList.remove('show'), 1100); }
+    function setErr(msg){ errEl.textContent = msg || ''; }
 
-    function showSnack(msg){
-      snack.textContent = msg;
-      snack.classList.add('show');
-      setTimeout(()=> snack.classList.remove('show'), 1100);
-    }
-
-    function loadData(){
-      try {
-        const raw = localStorage.getItem(STORAGE_KEY);
-        if(!raw) return [];
-        return JSON.parse(raw);
-      } catch(e){ return []; }
-    }
-    function saveData(data){
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
-      countEl.textContent = String(data.length);
-      renderTable(data);
-    }
-    function addScan(code){
-      const now = new Date().toISOString();
-      const data = loadData();
-      data.unshift({ code, date: now });
-      saveData(data);
-    }
-    function renderTable(data){
-      const rows = data.slice(0,10).map(r=>`<tr><td>${escapeHtml(r.code)}</td><td>${r.date}</td></tr>`).join('');
-      tbody.innerHTML = rows;
+    function loadData(){ try { return JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]'); } catch { return [];} }
+    function saveData(d){ localStorage.setItem(STORAGE_KEY, JSON.stringify(d)); render(); }
+    function addScan(code){ const d = loadData(); d.unshift({code, date:new Date().toISOString()}); saveData(d); showSnack('Guardado: '+code); }
+    function render(){
+      const d = loadData();
+      countEl.textContent = d.length;
+      tbody.innerHTML = d.slice(0,10).map(r=>`<tr><td>${escapeHtml(r.code)}</td><td>${r.date}</td></tr>`).join('');
     }
     function escapeHtml(s){ return s.replace(/[&<>"']/g, c=>({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;' }[c])); }
 
     async function listCameras(){
       const devices = await navigator.mediaDevices.enumerateDevices();
-      const cams = devices.filter(d=> d.kind === 'videoinput');
+      const cams = devices.filter(d => d.kind === 'videoinput');
       cameraSelect.innerHTML = cams.map((c,i)=>`<option value="${c.deviceId}">${c.label || 'Cámara '+(i+1)}</option>`).join('');
     }
 
     async function start(){
-      if(running) return;
-      running = true;
+      setErr('');
       try {
+        // algunos navegadores no dan labels si no hay permiso previo
+        await navigator.mediaDevices.getUserMedia({ video: true });
         await listCameras();
-        const deviceId = cameraSelect.value || undefined;
-        const constraints = deviceId ? { video: { deviceId: { exact: deviceId } } } : { video: { facingMode: 'environment' } };
-        currentStream = await navigator.mediaDevices.getUserMedia(constraints);
-        video.srcObject = currentStream;
 
-        // Decodificador en bucle (frame-by-frame)
-        const tick = async () => {
-          if(!running) return;
-          try {
-            const result = await reader.decodeOnceFromVideoElement(video);
-            const code = result?.getText?.() || result?.text || '';
+        const deviceId = cameraSelect.value || (await getBackCameraId());
+        controls = await reader.decodeFromVideoDevice(deviceId || undefined, video, (result, err) => {
+          if (result) {
+            const code = result.getText?.() || result.text || '';
             const now = Date.now();
-            // debounce: evita duplicados en < 900ms
-            if(code && !(code === lastCode && (now - lastHit) < 900)){
-              lastCode = code; lastHit = now;
-              addScan(code);
-              showSnack('Guardado: ' + code);
+            if(code && !(code===lastCode && (now-lastHit)<900)){
+              lastCode = code; lastHit = now; addScan(code);
             }
-          } catch (e) {
-            // Ignorar "NotFoundException" entre frames
-          } finally {
-            // Continúa intentando leer
-            requestAnimationFrame(tick);
           }
-        };
-        requestAnimationFrame(tick);
-      } catch(err){
-        console.error(err);
-        showSnack('No se pudo iniciar la cámara.');
+          // ignorar errores NotFoundException entre frames
+        });
+      } catch (e) {
+        console.error(e);
+        setErr('No se pudo iniciar la cámara. Verifica permisos, HTTPS y que el navegador la soporte.');
       }
     }
 
     function stop(){
-      running = false;
-      if(currentStream){
-        currentStream.getTracks().forEach(t=> t.stop());
-        currentStream = null;
-      }
+      setErr('');
+      try { controls?.stop(); } catch {}
+      // detener tracks por si quedó algo activo
+      const stream = video.srcObject;
+      if (stream && stream.getTracks) stream.getTracks().forEach(t=>t.stop());
+      video.srcObject = null;
+    }
+
+    async function getBackCameraId(){
+      const devices = await navigator.mediaDevices.enumerateDevices();
+      const cams = devices.filter(d=>d.kind==='videoinput');
+      // Heurística: buscar "back" o "trasera"
+      const back = cams.find(c=>/back|rear|trase|environment/i.test(c.label));
+      return (back || cams[0])?.deviceId;
     }
 
     function exportCsv(){
-      const data = loadData();
+      const d = loadData();
       const header = 'codigo,fecha\n';
-      const body = data.map(r => `"${r.code.replace(/"/g,'""')}","${r.date}"`).join('\n') + '\n';
-      const blob = new Blob([header + body], {type: 'text/csv;charset=utf-8;'});
+      const body = d.map(r=>`"${r.code.replace(/"/g,'""')}","${r.date}"`).join('\n') + '\n';
+      const blob = new Blob([header+body], {type:'text/csv;charset=utf-8;'});
       const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url; a.download = 'escaneos.csv';
-      document.body.appendChild(a); a.click(); a.remove();
-      URL.revokeObjectURL(url);
+      const a = document.createElement('a'); a.href=url; a.download='escaneos.csv'; a.click(); URL.revokeObjectURL(url);
     }
 
-    function clearAll(){
-      if(confirm('¿Borrar todos los registros?')){
-        saveData([]);
-      }
-    }
+    function clearAll(){ if(confirm('¿Borrar todos los registros?')) saveData([]); }
 
-    // Eventos UI
-    btnStart.addEventListener('click', start);
-    btnStop.addEventListener('click', stop);
-    btnExport.addEventListener('click', exportCsv);
-    btnClear.addEventListener('click', clearAll);
+    // Fallback: subir una foto con el código para decodificar offline
+    fileInput.addEventListener('change', async (e) => {
+      const file = e.target.files[0]; if(!file) return;
+      const url = URL.createObjectURL(file);
+      try {
+        const result = await reader.decodeFromImageUrl(url);
+        const code = result?.getText?.() || result?.text || '';
+        if(code) addScan(code); else setErr('No se detectó código en la imagen.');
+      } catch { setErr('No se detectó código en la imagen.'); }
+      finally { URL.revokeObjectURL(url); fileInput.value=''; }
+    });
+
+    document.getElementById('btnStart').addEventListener('click', start);
+    document.getElementById('btnStop').addEventListener('click', stop);
+    document.getElementById('btnExport').addEventListener('click', exportCsv);
+    document.getElementById('btnClear').addEventListener('click', clearAll);
     cameraSelect.addEventListener('change', ()=>{ stop(); start(); });
 
-    // Init UI con datos previos
-    saveData(loadData());
-
-    // Pre-permission para etiquetar cámaras (algunos navegadores no dan labels sin permiso)
-    navigator.mediaDevices.getUserMedia({video:true}).then(stream => {
-      stream.getTracks().forEach(t=>t.stop());
-      listCameras();
-    }).catch(()=>{});
+    // Inicializa tabla con datos almacenados
+    render();
   </script>
 </body>
 </html>
